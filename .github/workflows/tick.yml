@@ -1,0 +1,13 @@
+﻿name: tick
+# Cron o'rniga: darvozaning /tick ini har ~5 daqiqada chaqiradi (webhook'ni saqlaydi, bot uxlab qolsa uyg'otadi).
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: curl -fsS -m 25 https://manhwa-gate-5.compass-crm.workers.dev/tick || true
+

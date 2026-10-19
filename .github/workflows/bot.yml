@@ -1,0 +1,93 @@
+﻿name: bot
+# @Manhwatarjima1_bot ZAXIRA runner (GitHub; noutbuk o'chsa darvoza yoqadi): Telegram webhook -> darvoza (manhwa-gate-5) -> shu ish.
+# Xabarni qabul qiladi va har bobni ish hovuziga qo'yadi; telefon va ikkinchi GitHub ishi (helper.yml) bob olib yordam beradi.
+# Ish ~5 soat davom etadi, so'ng runner.py o'zi vorisini chaqiradi (darvoza ALWAYS_ON).
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: write
+concurrency:
+  group: bot
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        id: py
+        with:
+          python-version: "3.12"
+      - name: Kutubxonalar (keshdan)
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ steps.py.outputs.python-version }}-${{ hashFiles('requirements.txt') }}-v2
+      - name: O'rnatish
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r requirements.txt
+          BOT_TOKEN=x OWNER_ID=1 .venv/bin/python -c "import fast_ocr; fast_ocr.warm_up()"
+      - name: Shrift (Digital Strip, Blambot - repoga qo'yilmaydi, litsenziya)
+        continue-on-error: true
+        run: |
+          curl -fsSL -o /tmp/ds.zip "https://dl.dafont.com/dl/?f=digital_strip"
+          unzip -oj /tmp/ds.zip digistrip.ttf -d assets/fonts
+      - name: LaMa modeli (keshdan)
+        id: lama
+        uses: actions/cache@v4
+        with:
+          path: assets/models
+          key: lama-fp32-v1
+      - name: LaMa modelini yuklash
+        if: steps.lama.outputs.cache-hit != 'true'
+        continue-on-error: true
+        run: |
+          mkdir -p assets/models
+          curl -fsSL -o assets/models/lama_fp32.onnx "https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx"
+      - name: Bot
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          OWNER_ID: ${{ secrets.OWNER_ID }}
+          ONLY_IDS: "6778963428"
+          GATE_KEY: ${{ secrets.GATE_KEY }}
+          GATE_URL: https://manhwa-gate-5.compass-crm.workers.dev
+          OCR_ENGINE: fast
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODELS: "gemini-3.5-flash-lite:low,gemini-3.1-flash-lite:low,gemini-3.1-flash-lite-preview:low,gemini-3.5-flash:low,gemini-3.8-flash:low,gemini-3.7-flash:low,gemini-3.6-flash:low,gemma-4-31b-it"
+          RENDER_V2: "1"
+          FONT_STYLES: "1"
+          # buyurtma dizayni (shop.py) - PDF/ZIP bob ish hovuziga tushishi uchun SHART
+          SHOP_UI: "1"
+          CHAPTER_BATCH: "1"
+          GEMINI_CHUNK: "80"
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          BOT_SLOT: "1"
+          IDLE_EXIT: "600"
+          # darvozani kamroq so'rash (Cloudflare bepul kunlik so'rov limiti butun hisob uchun umumiy)
+          POLL_EVERY: "2"
+          PARALLEL_JOBS: "1"
+          PDF_JPEG_QUALITY: "80"
+          MIN_DELIVERY_SEC: "300"
+          RUNNER_ROLE: backup
+          PAGE_OCR_WORKERS: "2"
+          FAST_WORKERS: "2"
+          MAX_PDF_PAGES: "100000"
+          MAX_BIG_MB: "2000"
+          TRIAL_MAX_MB: "2000"
+          MAX_ORDER_CHAPTERS: "1000"
+          MAX_ORDER_FILES: "5000"
+          DAILY_LIMIT: "0"
+          DRAW_PAGES: "2"
+        run: |
+          if ! .venv/bin/python -V; then
+            echo "Kesh buzilgan - qayta o'rnatiladi"
+            rm -rf .venv && python -m venv .venv && .venv/bin/pip install -q -r requirements.txt
+          fi
+          .venv/bin/python runner.py
+
